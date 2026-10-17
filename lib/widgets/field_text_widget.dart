@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class FieldTextWidget extends StatefulWidget {
   final String name;
   final TextEditingController nameController;
-  FieldTextWidget({
+  const FieldTextWidget({
     super.key,
     required this.name,
     required this.nameController,

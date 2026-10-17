@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:tudee/Haiv_servies/Todo.dart';
+import 'package:tudee/services/Todo.dart';
 import 'package:tudee/screens/add_task_screen.dart';
 import 'package:tudee/screens/edit_task_screen.dart';
+import 'package:tudee/services/todo_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,12 +32,27 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _loadTodos() {
-    final box = Hive.box<Todo>('tasksBox');
+  // void _loadTodos() {
+  //   // final box = Hive.box<Todo>('tasksBox');
 
-    setState(() {
-      todos = box.values.toList();
-    });
+  //   // setState(() {
+  //   //   todos = box.values.toList();
+  //   // });
+  //   // Temporarily disabled while migrating to Firebase.
+  // }
+
+  Future<void> _loadTodos() async {
+    try {
+      final loadedTodos = await TodoService().getTodos();
+
+      if (!mounted) return;
+
+      setState(() {
+        todos = loadedTodos;
+      });
+    } catch (e) {
+      debugPrint('Error loading todos: $e');
+    }
   }
 
   @override
@@ -187,6 +203,28 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  final service = TodoService();
+                  await service.testAddTodo();
+
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Task added successfully!')),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              },
+              child: const Text('Test Firebase'),
+            ),
+
             const SizedBox(height: 18),
 
             // =========================
@@ -262,22 +300,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               // Edit Task
                               // =========================
                               onTap: () async {
-                                final box = Hive.box<Todo>('tasksBox');
-
-                                final key = box.keyAt(index);
-
                                 await Navigator.push(
                                   context,
-
                                   MaterialPageRoute(
                                     builder: (context) => EditTaskScreen(
                                       todo: todo,
-                                      taskKey: key,
+                                      taskKey: null,
                                     ),
                                   ),
                                 );
 
-                                _loadTodos();
+                                if (!mounted) return;
+                                await _loadTodos();
                               },
 
                               child: ListTile(
@@ -314,22 +348,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                       value: todo.isComplete,
 
                                       onChanged: (value) async {
-                                        final newValue = value ?? false;
-
                                         final updatedTodo = Todo(
+                                          id: todo.id,
                                           title: todo.title,
-                                          isComplete: newValue,
+                                          isComplete: value ?? false,
                                         );
 
-                                        final box = Hive.box<Todo>('tasksBox');
-
-                                        final key = box.keyAt(index);
-
-                                        await box.put(key, updatedTodo);
-
-                                        setState(() {
-                                          todos[index] = updatedTodo;
-                                        });
+                                        try {
+                                          await TodoService().updateTodo(
+                                            updatedTodo,
+                                          );
+                                          await _loadTodos();
+                                        } catch (e) {
+                                          debugPrint('Error updating task: $e');
+                                        }
                                       },
                                     ),
 
@@ -338,15 +370,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                       icon: const Icon(Icons.delete),
 
                                       onPressed: () async {
-                                        final box = Hive.box<Todo>('tasksBox');
+                                        final id = todo.id;
+                                        if (id == null) return;
 
-                                        final key = box.keyAt(index);
-
-                                        await box.delete(key);
-
-                                        setState(() {
-                                          todos.removeAt(index);
-                                        });
+                                        try {
+                                          await TodoService().deleteTodo(id);
+                                          await _loadTodos();
+                                        } catch (e) {
+                                          debugPrint('Error deleting task: $e');
+                                        }
                                       },
                                     ),
                                   ],
@@ -377,7 +409,8 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute(builder: (context) => const AddTask()),
             );
 
-            _loadTodos();
+            if (!mounted) return;
+            await _loadTodos();
           },
 
           backgroundColor: Colors.blue,

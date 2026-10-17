@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:tudee/services/todo_service.dart';
 import 'package:tudee/widgets/log_in_widget.dart';
-import 'package:tudee/Haiv_servies/Todo.dart';
+import 'package:tudee/services/Todo.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class EditTaskScreen extends StatefulWidget {
@@ -82,15 +83,30 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
 
             InkWell(
               onTap: () async {
-                final box = Hive.box<Todo>('tasksBox');
+                final title = taskController.text.trim();
+
+                if (title.isEmpty) return;
 
                 final updatedTodo = Todo(
-                  title: taskController.text,
+                  id: widget.todo.id,
+                  title: title,
                   isComplete: widget.todo.isComplete,
                 );
-                await box.put(widget.taskKey, updatedTodo);
-                Navigator.pop(context);
+
+                try {
+                  await TodoService().updateTodo(updatedTodo);
+
+                  if (!mounted) return;
+                  Navigator.pop(context, true);
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to update task: $e')),
+                  );
+                }
               },
+
               child: LogInWidget(name: "Save changes"),
             ),
           ],

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:tudee/services/todo_service.dart';
 import 'package:tudee/widgets/field_text_widget.dart';
 import 'package:tudee/widgets/log_in_widget.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:tudee/Haiv_servies/Todo.dart';
+import 'package:tudee/services/Todo.dart';
 
 class AddTask extends StatefulWidget {
   const AddTask({super.key});
@@ -56,10 +56,25 @@ class _AddTaskState extends State<AddTask> {
             const SizedBox(height: 20),
             InkWell(
               onTap: () async {
-                final box = Hive.box<Todo>('tasksBox');
-                final todo = Todo(title: taskController.text);
-                await box.add(todo);
-                Navigator.pop(context);
+                final title = taskController.text.trim();
+
+                if (title.isEmpty) return;
+
+                try {
+                  final todo = Todo(title: title);
+
+                  await TodoService().addTodo(todo);
+
+                  if (!mounted) return;
+
+                  Navigator.pop(context, true);
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save task: $e')),
+                  );
+                }
               },
 
               child: const LogInWidget(name: "Save"),
